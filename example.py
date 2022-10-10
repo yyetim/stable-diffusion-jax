@@ -78,7 +78,7 @@ uncond_input_ids = shard(uncond_input_ids)
 prng_seed = jax.random.split(prng_seed, jax.local_device_count())
 
 # pmap the sample function
-num_inference_steps = 500
+num_inference_steps = 50
 guidance_scale = 7.5
 
 sample = jax.pmap(pipe.sample, static_broadcasted_argnums=(4, 5))
