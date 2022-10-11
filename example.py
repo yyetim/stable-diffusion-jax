@@ -30,7 +30,7 @@ def image_grid(imgs, rows, cols):
     return grid
 
 # convert diffusers checkpoint to jax
-pt_path = "CompVis/stable-diffusion-v1-4"
+pt_path = "stable-diffusion-v1-4"
 fx_path = "/home/yyetim/stable-diffusion-v1-4-flax"
 def model_path(model_name):
     return os.path.join(fx_path, model_name)
@@ -61,7 +61,7 @@ inference_state = replicate(inference_state)
 pipe = StableDiffusionPipeline(text_encoder=clip_model, tokenizer=tokenizer, unet=unet, scheduler=scheduler, vae=vae)
 
 # prepare inputs
-num_samples = 8
+num_samples = 4
 p = "A cinematic film still of Morgan Freeman starring as Jimi Hendrix, portrait, 40mm lens, shallow depth of field, close up, split lighting, cinematic"
 
 input_ids = tokenizer(
@@ -81,9 +81,14 @@ prng_seed = jax.random.split(prng_seed, jax.local_device_count())
 num_inference_steps = 50
 guidance_scale = 7.5
 
+
+import time
+start = time.time()
 sample = jax.pmap(pipe.sample, static_broadcasted_argnums=(4, 5))
+print(f"pmap time: {time.time() - start}")
 
 # sample images
+start = time.time()
 images = sample(
     input_ids,
     uncond_input_ids,
@@ -92,6 +97,7 @@ images = sample(
     num_inference_steps,
     guidance_scale,
 )
+print(f"sample time: {time.time() - start}")
 
 
 # convert images to PIL images
