@@ -7,6 +7,7 @@ import os
 from PIL import Image
 from transformers import CLIPTokenizer, FlaxCLIPTextModel, CLIPConfig
 import tempfile
+import time
 
 from stable_diffusion_jax import (
     AutoencoderKL,
@@ -59,46 +60,58 @@ inference_state = replicate(inference_state)
 
 # create pipeline
 pipe = StableDiffusionPipeline(text_encoder=clip_model, tokenizer=tokenizer, unet=unet, scheduler=scheduler, vae=vae)
+sample = jax.pmap(pipe.sample, static_broadcasted_argnums=(4, 5))
 
-# prepare inputs
+def run_example(prompt, num_samples):
+    print(f"Running for prompt: {prompt}")
+    start = time.time()
+    # prepare inputs
+    input_ids = tokenizer(
+        [prompt] * num_samples, padding="max_length", truncation=True, max_length=77, return_tensors="jax"
+    ).input_ids
+    uncond_input_ids = tokenizer(
+        [""] * num_samples, padding="max_length", truncation=True, max_length=77, return_tensors="jax"
+    ).input_ids
+    prng_seed = jax.random.PRNGKey(42)
+
+    # shard inputs and rng
+    input_ids = shard(input_ids)
+    uncond_input_ids = shard(uncond_input_ids)
+    prng_seed = jax.random.split(prng_seed, jax.local_device_count())
+
+    # pmap the sample function
+    num_inference_steps = 50
+    guidance_scale = 7.5
+    print(f"tokenize inputs: {time.time() - start}")
+
+    # sample images
+    start = time.time()
+    images = sample(
+        input_ids,
+        uncond_input_ids,
+        prng_seed,
+        inference_state,
+        num_inference_steps,
+        guidance_scale,
+    )
+    images.block_until_ready()
+    print(f"sample time: {time.time() - start}")
+    return images
+
+
+# import jax.profiler
+# jax.profiler.start_server(9999)
 num_samples = 4
 p = "A cinematic film still of Morgan Freeman starring as Jimi Hendrix, portrait, 40mm lens, shallow depth of field, close up, split lighting, cinematic"
+images = run_example(p, num_samples)
 
-input_ids = tokenizer(
-    [p] * num_samples, padding="max_length", truncation=True, max_length=77, return_tensors="jax"
-).input_ids
-uncond_input_ids = tokenizer(
-    [""] * num_samples, padding="max_length", truncation=True, max_length=77, return_tensors="jax"
-).input_ids
-prng_seed = jax.random.PRNGKey(42)
+p = "A cinematic film still of Morgan Freeman starring as Jimi Hendrix, portrait, 40mm lens, shallow depth of field, close up, split lighting, cinematic"
+images = run_example(p, num_samples)
 
-# shard inputs and rng
-input_ids = shard(input_ids)
-uncond_input_ids = shard(uncond_input_ids)
-prng_seed = jax.random.split(prng_seed, jax.local_device_count())
-
-# pmap the sample function
-num_inference_steps = 50
-guidance_scale = 7.5
-
-
-import time
-start = time.time()
-sample = jax.pmap(pipe.sample, static_broadcasted_argnums=(4, 5))
-print(f"pmap time: {time.time() - start}")
-
-# sample images
-start = time.time()
-images = sample(
-    input_ids,
-    uncond_input_ids,
-    prng_seed,
-    inference_state,
-    num_inference_steps,
-    guidance_scale,
-)
-print(f"sample time: {time.time() - start}")
-
+num_samples = 4
+p = "A computer chip with wings flying above the clouds, epic, cinematic"
+images = run_example(p, num_samples)
+# jax.profiler.stop_server()
 
 # convert images to PIL images
 images = images / 2 + 0.5
