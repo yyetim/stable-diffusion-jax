@@ -17,7 +17,6 @@ class InferenceState:
 
 class StableDiffusionPipeline:
     def __init__(self, vae, text_encoder, tokenizer, unet, scheduler):
-        scheduler = scheduler.set_format("np")
         self.vae = vae
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer

@@ -32,7 +32,7 @@ def image_grid(imgs, rows, cols):
 
 # convert diffusers checkpoint to jax
 pt_path = "stable-diffusion-v1-4"
-fx_path = "/home/yyetim/stable-diffusion-v1-4-flax"
+fx_path = "/home/yeandy/stable-diffusion-v1-4-flax"
 def model_path(model_name):
     return os.path.join(fx_path, model_name)
 
