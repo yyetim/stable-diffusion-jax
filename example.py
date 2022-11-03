@@ -32,7 +32,8 @@ def image_grid(imgs, rows, cols):
 
 # convert diffusers checkpoint to jax
 pt_path = "stable-diffusion-v1-4"
-fx_path = "/home/yeandy/stable-diffusion-v1-4-flax"
+user = os.environ['USER']
+fx_path = f"/home/{user}/stable-diffusion-v1-4-flax"
 def model_path(model_name):
     return os.path.join(fx_path, model_name)
 
@@ -86,15 +87,16 @@ def run_example(prompt, num_samples):
 
     # sample images
     start = time.time()
-    images = sample(
-        input_ids,
-        uncond_input_ids,
-        prng_seed,
-        inference_state,
-        num_inference_steps,
-        guidance_scale,
-    )
-    images.block_until_ready()
+    with jax.profiler.trace("./traces"):
+        images = sample(
+            input_ids,
+            uncond_input_ids,
+            prng_seed,
+            inference_state,
+            num_inference_steps,
+            guidance_scale,
+        )
+        images.block_until_ready()
     print(f"sample time: {time.time() - start}")
     return images
 
