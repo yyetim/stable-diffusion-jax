@@ -83,7 +83,8 @@ def run_example(prompt, num_samples):
     # pmap the sample function
     num_inference_steps = 50
     guidance_scale = 7.5
-    print(f"tokenize inputs: {time.time() - start}")
+    tokenize_time = time.time() - start
+    print(f"tokenize inputs: {tokenize_time}")
 
     # sample images
     start = time.time()
@@ -97,34 +98,71 @@ def run_example(prompt, num_samples):
             guidance_scale,
         )
         images.block_until_ready()
-    print(f"sample time: {time.time() - start}")
-    return images
+    sample_time = time.time() - start
+    print(f"sample time: {sample_time}")
+    return images, tokenize_time, sample_time
 
 
 # import jax.profiler
 # jax.profiler.start_server(9999)
 num_samples = 4
+print("\n\n")
+print(f"Running an initial XLA compilation pass on {num_samples} samples")
 p = "A cinematic film still of Morgan Freeman starring as Jimi Hendrix, portrait, 40mm lens, shallow depth of field, close up, split lighting, cinematic"
-images = run_example(p, num_samples)
+images, tokenize_time, sample_time = run_example(p, num_samples)
 
-p = "A cinematic film still of Morgan Freeman starring as Jimi Hendrix, portrait, 40mm lens, shallow depth of field, close up, split lighting, cinematic"
-images = run_example(p, num_samples)
+print(f"Running on same sample after initial XLA pass")
+images, tokenize_time, sample_time = run_example(p, num_samples)
 
-num_samples = 4
+print(f"Running on different sample after initial XLA pass")
 p = "A computer chip with wings flying above the clouds, epic, cinematic"
-images = run_example(p, num_samples)
-# jax.profiler.stop_server()
+images, tokenize_time, sample_time = run_example(p, num_samples)
+print("\n\n")
 
-# convert images to PIL images
-images = images / 2 + 0.5
-images = jnp.clip(images, 0, 1)
-images = (images * 255).round().astype("uint8")
-images = np.asarray(images).reshape((num_samples, 512, 512, 3))
+# Create batch sizes
+group_size = 8
+step = 128
+n_groups = 10
+batch_sizes_per_core = [8, 16, 24, 32, 40, 48, 56, 64]
+for group in range(n_groups):
+    print(step, group)
+    batch_sizes = batch_sizes_per_core.extend(list(range(step, step * group_size, step)))
+    step = step * group_size
 
-pil_images = [Image.fromarray(image) for image in images]
+n_cores = 4
+batch_sizes_all_cores = [n_cores * batch_size for batch_size in batch_sizes_per_core]
 
-grid = image_grid(pil_images, rows=1, cols=num_samples)
+print(f"All batch sizes: {batch_sizes_all_cores}")
+tokenize_times = []
+sample_times = []
+for batch_size in batch_sizes_all_cores:
+    print(f"Running for batch size {batch_size}")
+    p = "A cinematic film still of Morgan Freeman starring as Jimi Hendrix, portrait, 40mm lens, shallow depth of field, close up, split lighting, cinematic"
+    try:
+        images, tokenize_time, sample_time = run_example(p, batch_size)
+        tokenize_times.append(tokenize_time)
+        sample_times.append(sample_time)
+    except Exception as e:
+        print(f"Exception {e} for batch size {batch_size}")
 
-temp_dir = tempfile.mkdtemp()
-print(f"Outputting to directory: {temp_dir}")
-grid.save(os.path.join(temp_dir, f"image.png"))
+print(f"Tokenize times: {tokenize_times}")
+print(f"Sample times: {sample_times}")
+
+# num_samples = 4
+# p = "A computer chip with wings flying above the clouds, epic, cinematic"
+# images = run_example(p, num_samples)
+# # jax.profiler.stop_server()
+
+# # convert images to PIL images
+# images = images / 2 + 0.5
+# images = jnp.clip(images, 0, 1)
+# images = (images * 255).round().astype("uint8")
+# images = np.asarray(images).reshape((num_samples, 512, 512, 3))
+
+# pil_images = [Image.fromarray(image) for image in images]
+
+# grid = image_grid(pil_images, rows=1, cols=num_samples)
+
+# temp_dir = tempfile.mkdtemp()
+# print(f"Outputting to directory: {temp_dir}")
+# grid.save(os.path.join(temp_dir, f"image.png"))
