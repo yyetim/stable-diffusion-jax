@@ -29,7 +29,7 @@ from stable_diffusion_jax.convert_diffusers_to_jax import convert_diffusers_to_j
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--scenario", choices=["SingleStream", "Offline",
-                        "Server", "MultiStream"], default="Offline", help="Scenario")
+                        "Server", "MultiStream"], default="MultiStream", help="Scenario")
     args = parser.parse_args()
     return args
 
@@ -186,7 +186,7 @@ def main():
   m.predict(input_ids, uncond_input_ids)
   print("Done with warmup!\n")
 
-  batches = [4]#, 8, 16, 32]
+  batches = [4, 8, 16, 32]
   for batch in batches:
     print(f"Running loadgen on batch size {batch}")
     log_dir = f'./mlperf_log_output/batch_size_{batch}'
