@@ -209,10 +209,9 @@ def main():
       settings.multi_stream_target_latency_ns = 100000000
       settings.multi_stream_samples_per_query = batch
       settings.multi_stream_max_async_queries = 2
-    # elif args.scenario == 'Server':
-    #   settings.scenario = lg.TestScenario.Server
-    #   settings.server_target_qps = 100
-    #   settings.server_target_latency_ns = 100000000
+    elif args.scenario == 'Offline':
+      settings.scenario = lg.TestScenario.Offline
+      settings.offline_expected_qps = 1000
     else:
       print(f"Scenario {args.scenario} not supported in JAX. Exiting.")
       return
