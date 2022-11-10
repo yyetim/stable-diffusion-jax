@@ -4,6 +4,7 @@ import time
 import os
 import pathlib
 
+import argparse
 import jax
 import jax.numpy as jnp
 import mlperf_loadgen as lg
@@ -24,6 +25,13 @@ from stable_diffusion_jax import StableDiffusionPipeline
 from stable_diffusion_jax import StableDiffusionSafetyCheckerModel
 from stable_diffusion_jax import UNet2D
 from stable_diffusion_jax.convert_diffusers_to_jax import convert_diffusers_to_jax
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--scenario", choices=["SingleStream", "Offline",
+                        "Server", "MultiStream"], default="Offline", help="Scenario")
+    args = parser.parse_args()
+    return args
 
 class StableDiffusionJax():
   def __init__(self,
@@ -162,6 +170,7 @@ class StableDiffusionJax():
     return images
 
 def main():
+  args = get_args()
 
   m = StableDiffusionJax(count=4096)
 
@@ -177,11 +186,11 @@ def main():
   m.predict(input_ids, uncond_input_ids)
   print("Done with warmup!\n")
 
-  batches = [4, 8, 16, 32]
+  batches = [4]#, 8, 16, 32]
   for batch in batches:
     print(f"Running loadgen on batch size {batch}")
     log_dir = f'./mlperf_log_output/batch_size_{batch}'
-    pathlib.Path(log_dir).mkdir(parents=True, exist_ok=True) 
+    pathlib.Path(log_dir).mkdir(parents=True, exist_ok=True)
 
     log_output_settings = lg.LogOutputSettings()
     log_output_settings.outdir = log_dir
@@ -191,17 +200,26 @@ def main():
     log_settings.log_output = log_output_settings
 
     settings = lg.TestSettings()
-    settings.scenario = lg.TestScenario.MultiStream
     settings.mode = lg.TestMode.PerformanceOnly
-    settings.multi_stream_target_latency_ns = 100000000
-    settings.multi_stream_samples_per_query = batch
-    settings.multi_stream_max_async_queries = 2
     settings.min_query_count = 100
     settings.min_duration_ms = 10000
 
+    if args.scenario == 'MultiStream':
+      settings.scenario = lg.TestScenario.MultiStream
+      settings.multi_stream_target_latency_ns = 100000000
+      settings.multi_stream_samples_per_query = batch
+      settings.multi_stream_max_async_queries = 2
+    # elif args.scenario == 'Server':
+    #   settings.scenario = lg.TestScenario.Server
+    #   settings.server_target_qps = 100
+    #   settings.server_target_latency_ns = 100000000
+    else:
+      print(f"Scenario {args.scenario} not supported in JAX. Exiting.")
+      return
+
     sut = m.create_sut()
     qsl = m.create_qsl()
-    print("Starting test")
+    print(f"Starting {args.scenario} test")
     lg.StartTestWithLogSettings(sut, qsl, settings, log_settings)
     print("Finish test")
     lg.DestroyQSL(qsl)
