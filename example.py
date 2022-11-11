@@ -51,6 +51,10 @@ unet, unet_params = UNet2D.from_pretrained(model_path("unet"), _do_init=False, d
 vae, vae_params = AutoencoderKL.from_pretrained(model_path("vae"), _do_init=False, dtype=dtype)
 # safety_model, safety_model_params = StableDiffusionSafetyCheckerModel.from_pretrained(f"{fx_path}/safety_model", _do_init=False, dtype=dtype)
 
+clip_params = clip_model.to_bf16(clip_params)
+unet_params = unet.to_bf16(unet_params)
+vae_params = vae.to_bf16(vae_params)
+
 config = CLIPConfig.from_pretrained("openai/clip-vit-large-patch14")
 tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
 scheduler = PNDMScheduler()
