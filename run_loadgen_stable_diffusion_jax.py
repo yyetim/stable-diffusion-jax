@@ -30,6 +30,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--scenario", choices=["SingleStream", "Offline",
                         "Server", "MultiStream"], default="MultiStream", help="Scenario")
+    parser.add_argument("--n_chips", required=True, type=int, help="Number of TPU chips")
     args = parser.parse_args()
     return args
 
@@ -178,18 +179,18 @@ def main():
   print("Starting warmup...")
   prompt = "A cinematic film still of Morgan Freeman starring as Jimi Hendrix, portrait, 40mm lens, shallow depth of field, close up, split lighting, cinematic"
   input_ids = m.tokenizer(
-      [prompt] * 4, padding="max_length", truncation=True, max_length=77, return_tensors="jax"
+      [prompt] * args.n_chips, padding="max_length", truncation=True, max_length=77, return_tensors="jax"
   ).input_ids
   uncond_input_ids = m.tokenizer(
-      [""] * 4, padding="max_length", truncation=True, max_length=77, return_tensors="jax"
+      [""] * args.n_chips, padding="max_length", truncation=True, max_length=77, return_tensors="jax"
   ).input_ids
   m.predict(input_ids, uncond_input_ids)
   print("Done with warmup!\n")
 
-  batches = [4, 8, 16, 32]
+  batches = [args.n_chips * i for i in range(1, 3)] + [args.n_chips * i for i in range(4, 9, 4)]
   for batch in batches:
     print(f"Running loadgen on batch size {batch}")
-    log_dir = f'./mlperf_log_output/batch_size_{batch}'
+    log_dir = f'./mlperf_log_outputs/batch_size_{batch}'
     pathlib.Path(log_dir).mkdir(parents=True, exist_ok=True)
 
     log_output_settings = lg.LogOutputSettings()
@@ -201,7 +202,7 @@ def main():
 
     settings = lg.TestSettings()
     settings.mode = lg.TestMode.PerformanceOnly
-    settings.min_query_count = 100
+    settings.min_query_count = 10
     settings.min_duration_ms = 10000
 
     if args.scenario == 'MultiStream':
