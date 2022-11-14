@@ -31,6 +31,9 @@ def get_args():
     parser.add_argument("--scenario", choices=["SingleStream", "Offline",
                         "Server", "MultiStream"], default="MultiStream", help="Scenario")
     parser.add_argument("--n_chips", required=True, type=int, help="Number of TPU chips")
+    parser.add_argument("--batch_sizes", 
+        required=True, help="Delimited batch sizes",
+        type=lambda batches: [int(batch) for batch in batches.split(',')])
     args = parser.parse_args()
     return args
 
@@ -191,10 +194,10 @@ def main():
   m.predict(input_ids, uncond_input_ids)
   print("Done with warmup!\n")
 
-  batches = [args.n_chips * i for i in range(1, 3)] + [args.n_chips * i for i in range(4, 9, 4)]
-  for batch in batches:
+  batches = args.batch_sizes
+  for batch in batch_sizes:
     print(f"Running loadgen on batch size {batch}")
-    log_dir = f'./mlperf_log_outputs/batch_size_{batch}'
+    log_dir = f'./mlperf_log_outputs/jax/{args.accelerator}/batch{batch}'
     pathlib.Path(log_dir).mkdir(parents=True, exist_ok=True)
 
     log_output_settings = lg.LogOutputSettings()
