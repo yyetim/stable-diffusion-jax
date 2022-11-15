@@ -93,7 +93,6 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         self.timesteps = None
 
         self.tensor_format = tensor_format
-        self.set_format(tensor_format=tensor_format)
 
     def set_timesteps(self, num_inference_steps, offset=0):
         self.num_inference_steps = num_inference_steps
@@ -128,7 +127,6 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
 
         self.ets = []
         self.counter = 0
-        self.set_format(tensor_format=self.tensor_format)
 
     def step(
         self,
